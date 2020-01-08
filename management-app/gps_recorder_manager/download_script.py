@@ -1,4 +1,7 @@
 import json
+import csv
+import pytz
+import datetime
 import serial.tools.list_ports
 from serial import Serial
 from time import sleep
@@ -49,6 +52,7 @@ def main():
     ls = json.loads(ls)
 
     count = 1
+    to_convert = []
     for file in ls:
         print("Downloading file %s of %s" % (count, len(ls)))
         if not file.startswith('.'):
@@ -60,9 +64,66 @@ def main():
             data = data.replace('OK', '')
             data = data.rstrip()
             data = data.lstrip()
-            f = open('%s.csv' % file, 'a')
+            csv_name = '%s.csv' % file
+            f = open(csv_name, 'a')
             f.write(data)
             f.close()
+            to_convert.append(csv_name)
+        count += 1
+
+    count = 1
+    for file in to_convert:
+        print("Converting file %s of %s to GPX format" % (count, len(to_convert)))
+        gpx_name = '%s.gpx' % file.replace('.csv', '')
+
+        csv_file = open(file, 'r')
+        csv_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
+        valid_date = None
+        for row in csv_reader:
+            date = row[0]
+            try:
+                valid_date = datetime.datetime.strptime(date, '%d/%m/%Y %H:%M:%S')
+                valid_date.replace(tzinfo=pytz.UTC)
+                break
+            except:
+                pass
+        csv_file.close()
+
+        if not valid_date:
+            print("Error processing file")
+            valid_date = datetime.datetime.utcnow()
+
+        gpx_file = open(gpx_name, 'a')
+        gpx_file.write('''<?xml version="1.0" encoding="UTF-8"?>''')
+        gpx_file.write('''<gpx creator="GPS Recorder" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1" xmlns="http://www.topografix.com/GPX/1/1">''')
+        gpx_file.write('''<metadata>''')
+        formatted_start_date = '%sZ' % valid_date.isoformat()
+        gpx_file.write('''<time>%s</time>''' % formatted_start_date)
+        gpx_file.write('''</metadata>''')
+        gpx_file.write('''<trk>''')
+        gpx_file.write('''<name>GPS Recorder Export</name><type>1</type>''')
+        gpx_file.write('''<trkseg>''')
+
+        csv_file = open(file, 'r')
+        csv_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
+        for row in csv_reader:
+            date = row[0]
+            try:
+                valid_date = datetime.datetime.strptime(date, '%d/%m/%Y %H:%M:%S')
+                valid_date.replace(tzinfo=pytz.UTC)
+                if row[1] == 'null' or row[2] == 'null' or row[3] == 'null':
+                    raise Exception("Bad values")
+                gpx_file.write('''<trkpt lat="%s" lon="%s">''' % (row[1], row[2]))
+                gpx_file.write('''<ele>%s</ele>''' % row[3])
+                gpx_file.write('''<time>%sZ</time>''' % valid_date.isoformat())
+                gpx_file.write('''</trkpt>''')
+            except:
+                pass
+
+        gpx_file.write('''</trkseg>''')
+        gpx_file.write('''</trk>''')
+        gpx_file.write('''</gpx>''')
+        gpx_file.close()
         count += 1
 
     conn.close()
