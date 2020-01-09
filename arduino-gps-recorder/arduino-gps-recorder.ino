@@ -21,7 +21,7 @@ int downloadMode = 0;
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(38400);
   ss.begin(GPSBaud);
 
   Serial.println(F("Starting GPS Recorder"));

@@ -39,7 +39,7 @@ def get_device():
 
 def main():
     device = get_device()
-    conn = Serial(device)
+    conn = Serial(device, 38400)
     conn.read_until(b'Waiting 30 seconds for computer connection to enter download mode...')
     conn.write(b'1')
     conn.read_until(b'OK')
@@ -84,6 +84,8 @@ def main():
             try:
                 valid_date = datetime.datetime.strptime(date, '%d/%m/%Y %H:%M:%S')
                 valid_date.replace(tzinfo=pytz.UTC)
+                if valid_date.year < 2019:
+                    raise Exception("Date is too old.")
                 break
             except:
                 pass
@@ -111,14 +113,16 @@ def main():
             try:
                 valid_date = datetime.datetime.strptime(date, '%d/%m/%Y %H:%M:%S')
                 valid_date.replace(tzinfo=pytz.UTC)
-                if row[1] == 'null' or row[2] == 'null' or row[3] == 'null':
+                if valid_date.year < 2019:
+                    raise Exception("Date is too old.")
+                if row[1].strip() == 'null' or row[2].strip() == 'null' or row[3].strip() == 'null':
                     raise Exception("Bad values")
-                gpx_file.write('''<trkpt lat="%s" lon="%s">''' % (row[1], row[2]))
-                gpx_file.write('''<ele>%s</ele>''' % row[3])
+                gpx_file.write('''<trkpt lat="%s" lon="%s">''' % (row[1].strip(), row[2].strip()))
+                gpx_file.write('''<ele>%s</ele>''' % row[3].strip())
                 gpx_file.write('''<time>%sZ</time>''' % valid_date.isoformat())
                 gpx_file.write('''</trkpt>''')
-            except:
-                pass
+            except Exception as err:
+                print("Hit exception: %s" % str(err))
 
         gpx_file.write('''</trkseg>''')
         gpx_file.write('''</trk>''')
